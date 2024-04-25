@@ -175,6 +175,7 @@ class AlphaPool(AlphaPoolBase):
             if ic_mut_threshold is not None and mutual_ic > ic_mut_threshold:
                 return single_ic, None
             mutual_ics.append(mutual_ic)
+
         return single_ic, mutual_ics
 
     def _add_factor(
@@ -208,4 +209,3 @@ class AlphaPool(AlphaPoolBase):
         self.mutual_ics[:, [i, j]] = self.mutual_ics[:, [j, i]]
         self.mutual_ics[[i, j], :] = self.mutual_ics[[j, i], :]
         self.weights[i], self.weights[j] = self.weights[j], self.weights[i]
-

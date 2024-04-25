@@ -17,6 +17,7 @@ from alphagen.utils.random import reseed_everything
 from alphagen.rl.env.core import AlphaEnvCore
 from alphagen_qlib.calculator import QLibStockDataCalculator
 
+
 class CustomCallback(BaseCallback):
     def __init__(self,
                  save_freq: int,
@@ -182,6 +183,7 @@ def fire_helper(
              pool,
              default_steps[int(pool)] if step is None else int(step)
              )
+
 
 if __name__ == '__main__':
     fire.Fire(fire_helper)

@@ -64,6 +64,7 @@ class TokenEmbedding(nn.Module):
 
         return result
 
+
 # Deprecated!
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model: int, max_len: int = 5000):
