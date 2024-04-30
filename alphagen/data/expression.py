@@ -211,7 +211,6 @@ class RollingOperator(Operator):
     @property
     def is_featured(self): return self._operand.is_featured
 
-
 class PairRollingOperator(Operator):
     def __init__(self,
                  lhs: Expression, rhs: Expression,

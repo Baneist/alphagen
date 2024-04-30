@@ -66,7 +66,6 @@ class TransformerSharedNet(BaseFeaturesExtractor):
         res = self._transformer(src, src_key_padding_mask=pad_mask)
         return res.mean(dim=1)
 
-
 class LSTMSharedNet(BaseFeaturesExtractor):
     def __init__(
         self,

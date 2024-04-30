@@ -62,6 +62,7 @@ class AlphaEnvCore(gym.Env):
         truncated = False  # Fk gymnasium
         return self._tokens, reward, done, truncated, self._valid_action_types()
 
+
     def _evaluate(self):
         expr: Expression = self._builder.get_tree()
         if self._print_expr:

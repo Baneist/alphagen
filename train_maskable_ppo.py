@@ -16,6 +16,7 @@ from alphagen.rl.policy import LSTMSharedNet
 from alphagen.utils.random import reseed_everything
 from alphagen.rl.env.core import AlphaEnvCore
 from alphagen_qlib.calculator import QLibStockDataCalculator
+from cppo.Pendulum_PPO import Pendulum_PPO
 
 class CustomCallback(BaseCallback):
     def __init__(self,
@@ -95,7 +96,6 @@ def main(
     steps: int = 200_000
 ):
     reseed_everything(seed)
-
     device = torch.device('cuda:0')
     close = Feature(FeatureType.CLOSE)
     target = Ref(close, -20) / close - 1
@@ -121,7 +121,6 @@ def main(
         l1_alpha=5e-3
     )
     env = AlphaEnv(pool=pool, device=device, print_expr=True)
-
     name_prefix = f"new_{instruments}_{pool_capacity}_{seed}"
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
 
@@ -135,7 +134,7 @@ def main(
         timestamp=timestamp,
         verbose=1,
     )
-
+    #Pendulum_PPO(env, 1e-5,)
     model = MaskablePPO(
         'MlpPolicy',
         env,
@@ -160,6 +159,7 @@ def main(
         callback=checkpoint_callback,
         tb_log_name=f'{name_prefix}_{timestamp}',
     )
+
 
 
 def fire_helper(

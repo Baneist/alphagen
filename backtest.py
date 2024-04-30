@@ -153,7 +153,18 @@ if __name__ == "__main__":
     # expr = Greater(Mul(Constant(-0.5),vwap),Mul(Sub(vwap,low),Constant(30.0)))
     # expr = Add(Div(Sub(Constant(-0.01),Sub(vwap,low)),Constant(-1.0)),vwap)
     report = []
-
+    for expr in [
+        Ref(Add(Add(Abs(Div(Mul(Less(Constant(-0.5),high), volume), Add(Constant(-2.0), volume))), Log(Div(high, Constant(2.0)))), Constant(2.0)), 40),
+        Mul(Constant(-0.5), Delta(Std(Mad(Add(low, Constant(-5.0)), 30), 30), 40)),
+        Mul(Greater(Constant(5.0), Add(Greater(open_, Constant(-2.0)), open_)), Div(open_, Constant(-30.0))),
+        Mul(Greater(Mul(Constant(10.0), Add(Mad(vwap, 40), Constant(-0.5))), Constant(-5.0)), vwap),
+        Var(Med(Std(Add(Less(Constant(-30.0), vwap), Mul(Mul(high, Constant(-0.01)), Constant(0.01))), 30), 20), 30),
+        Mul(Mul(Greater(Constant(2.0), Mul(close, Constant(-0.5))), Add(close, Mul(Mul(Constant(10.0), Mul(Mul(vwap, volume), open_)), Constant(-2.0)))), Constant(-0.5)),
+        Mul(EMA(Sub(Delta(Mul(Log(open_), Constant(-30.0)), 50), Constant(-0.01)), 40), Mul(Div(Abs(EMA(low, 50)), close), Constant(0.01))),
+    ]:
+        data_df = data.make_dataframe(expr.evaluate(data))
+        report.append(qlib_backtest.run(data_df))
+    '''
     for expr in [
         Mul(EMA(Sub(Delta(Mul(Log(open_), Constant(-30.0)), 50), Constant(-0.01)), 40),Mul(Div(Abs(EMA(low, 50)), close), Constant(0.01))),
         Abs(Abs(Log(Sum(Mul(Mul(Constant(-5.0), Log(Div(Greater(Sub(Sub(vwap, Constant(-0.01)), Constant(1.0)), vwap),Constant(30.0)))), Constant(-0.5)), 30)))),
@@ -164,20 +175,24 @@ if __name__ == "__main__":
     ]:
         data_df = data.make_dataframe(expr.evaluate(data))
         report.append(qlib_backtest.run(data_df))
+    '''
+
     def plt_show():
         import matplotlib.pyplot as plt
         for i in range(len(report)):
             report[i].index = pd.to_datetime(report[i].index)
         report.append(report[0])
-        for i in range(1, 4):
+        r_len = 6
+        for i in range(1, r_len+1):
             for j in range(len(report[-1]['account'])):
                 report[-1]['account'][j] += report[i]['account'][j]
         for j in range(len(report[-1]['account'])):
-            report[-1]['account'][j] /= 4
+            report[-1]['account'][j] /= r_len
         # 绘制账户余额变化曲线
         plt.figure(figsize=(10, 6))
-        colors = ['blue','blue','blue','blue', 'yellow', 'red', 'cyan', 'magenta', 'green', 'black', 'orange']
-        labels = [f'alphagen-{i}' for i in range(1, 5)] + ['gplearn', 'dso', 'alphagen-avg']
+        colors = ['blue', 'yellow', 'red', 'cyan', 'magenta', 'green', 'black', 'orange', 'grey']
+        #labels = [f'alphagen-{i}' for i in range(1, r_len+1)] + ['gplearn', 'dso', 'alphagen-avg']
+        labels = [f'cppo-{i}' for i in range(1, r_len + 1)] + ['alphagen', 'cppo-avg']
         for i, account in enumerate(report):
             plt.plot(account.index, account['account'], color=colors[i % len(colors)], label=labels[i])#f'Alpha {i+1}')
         plt.xlabel('Date')

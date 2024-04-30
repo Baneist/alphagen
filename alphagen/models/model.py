@@ -20,7 +20,6 @@ class TokenEmbedding(nn.Module):
         self._operators = operators
         self._delta_time_range = delta_time_range
         self._device = device
-
         self._const_linear = nn.Linear(1, d_model, device=device)
         dt_count = delta_time_range[1] - delta_time_range[0]
         total_emb = (len(SequenceIndicatorType) + len(FeatureType) +

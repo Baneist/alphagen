@@ -9,18 +9,16 @@ import numpy as np
 import gym
 import matplotlib.pyplot as plt
 from matplotlib import animation
-from Policy import PPOPolicy
-from PPOBuffer import PPOBuffer
+from cppo.Policy import PPOPolicy
+from cppo.PPOBuffer import PPOBuffer
 
 
 NUM_STEPS = 2048                    # Number of timesteps data to collect before updating
-BATCH_SIZE = 64                     # Batch size of training data
+BATCH_SIZE = 128                     # Batch size of training data
 TOTAL_TIMESTEPS = NUM_STEPS * 500   # Total timesteps to run
-GAMMA = 0.99                        # Discount factor
+GAMMA = 1                        # Discount factor
 GAE_LAM = 0.95                      # Lambda value for generalized advantage estimation
 NUM_EPOCHS = 10                     # Number of epochs to train
-
-
 
 class PI_Network(nn.Module):
     def __init__(self, obs_dim, action_dim, lower_bound, upper_bound) -> None:
@@ -58,14 +56,15 @@ class V_Network(nn.Module):
 
         return values
         
-if __name__ == "__main__":
-    env = gym.make("Pendulum-v1")
+def Pendulum_PPO(env,learning_rate, train_test = "train"):
     obs_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.shape[0]
-    lower_bound = env.action_space.low
-    upper_bound = env.action_space.high
-    
-    train_test = "train" if len(sys.argv)==1 else sys.argv[1]
+    #action_dim = env.action_space.shape[0]
+    #lower_bound = env.action_space.low
+    #upper_bound = env.action_space.high
+    action_dim = 42
+    lower_bound = 0
+    upper_bound = 42
+
     if train_test=="train":
         # Setup tensorboard summary writer
         if "Log" not in os.listdir("./"):
@@ -75,10 +74,7 @@ if __name__ == "__main__":
         # Create networks
         pi_network = PI_Network(obs_dim, action_dim, lower_bound, upper_bound)
         v_network = V_Network(obs_dim)
-
-        learning_rate = 3e-4
-
-        buffer = PPOBuffer(obs_dim, action_dim, NUM_STEPS)
+        buffer = PPOBuffer(obs_dim, action_dim, NUM_STEPS,)
         policy = PPOPolicy(
             pi_network,
             v_network,
@@ -90,11 +86,9 @@ if __name__ == "__main__":
             initial_std=1.0,
             max_grad_norm=0.5,
         )
-
         ep_reward = 0.0
         ep_count = 0
         season_count = 0
-
         pi_losses, v_losses, total_losses, approx_kls, stds = [], [], [], [], []
         mean_rewards = []
 
@@ -189,12 +183,12 @@ if __name__ == "__main__":
                 mean_ep_reward = ep_reward / ep_count
                 ep_reward, ep_count = 0.0, 0
 
-                summary_writer.add_scalar("misc/ep_reward_mean", np.mean(mean_ep_reward), t)
-                summary_writer.add_scalar("train/pi_loss", np.mean(pi_losses), t)
-                summary_writer.add_scalar("train/v_loss", np.mean(v_losses), t)
-                summary_writer.add_scalar("train/total_loss", np.mean(total_losses), t)
-                summary_writer.add_scalar("train/approx_kl", np.mean(approx_kls), t)
-                summary_writer.add_scalar("train/std", np.mean(stds), t)
+                summary_writer.add_scalar("./misc/ep_reward_mean", np.mean(mean_ep_reward), t)
+                summary_writer.add_scalar("./train/pi_loss", np.mean(pi_losses), t)
+                summary_writer.add_scalar("./train/v_loss", np.mean(v_losses), t)
+                summary_writer.add_scalar("./train/total_loss", np.mean(total_losses), t)
+                summary_writer.add_scalar("./train/approx_kl", np.mean(approx_kls), t)
+                summary_writer.add_scalar("./train/std", np.mean(stds), t)
                 print(f"Season={season_count} --> mean_ep_reward={mean_ep_reward}, pi_loss={np.mean(pi_losses)}, v_loss={np.mean(v_losses)}, total_loss={np.mean(total_losses)}, approx_kl={np.mean(approx_kls)}, avg_std={np.mean(stds)}")
 
                 mean_rewards.append(mean_ep_reward)
@@ -203,8 +197,8 @@ if __name__ == "__main__":
         # Close summarywriter
         summary_writer.close()
         # Save policy and value network
-        torch.save(pi_network.state_dict(), 'saved_network/pi_network.pth')
-        torch.save(v_network.state_dict(), 'saved_network/v_network.pth')
+        torch.save(pi_network.state_dict(), './saved_network/pi_network.pth')
+        torch.save(v_network.state_dict(), './saved_network/v_network.pth')
 
         # Plot episodic reward
         _, ax = plt.subplots(1, 1, figsize=(5, 4), constrained_layout=True)
@@ -212,7 +206,7 @@ if __name__ == "__main__":
         ax.set_xlabel("season")
         ax.set_ylabel("episodic reward")
         ax.grid(True)
-        plt.savefig("saved_images/season_reward.png")
+        plt.savefig("./saved_images/season_reward.png")
 
     elif train_test=="eval" or train_test=="test":
         # Function to create gif animation. Taken from: https://gist.github.com/botforge/64cbb71780e6208172bbf03cd9293553 

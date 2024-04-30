@@ -8,3 +8,39 @@ EMA(Sub(Corr(open_,close,20),Corr(close,volume,10)),40)
 DSO:
 Cov₃₀(Constant(-0.01), Cov₁₀(x₅, Sub(x₂, Sum₅₀(Var₁₀(Constant(-0.5))))))
 等价形式 Cov(Constant(-0.01), Cov(vwap, Sub(high, Sum(Var(Constant(-0.5), 10), 50)), 10), 30)
+
+Ref(Add(Add(Abs(Div(Mul(Less(Constant(-0.5),$high),$volume),Add(Constant(-2.0),$volume))),Log(Div($high,Constant(2.0)))),Constant(2.0)),40)
+Mul(Constant(-0.5),Delta(Std(Mad(Add($low,Constant(-5.0)),30),30),40))
+Mul(Greater(Constant(5.0),Add(Greater($open,Constant(-2.0)),$open)),Div($open,Constant(-30.0)))
+Mul(Greater(Mul(Constant(10.0),Add(Mad($vwap,40),Constant(-0.5))),Constant(-5.0)),$vwap)
+Var(Med(Std(Add(Less(Constant(-30.0),$vwap),Mul(Mul($high,Constant(-0.01)),Constant(0.01))),30),20),30)
+Mul(Mul(Greater(Constant(2.0),Mul($close,Constant(-0.5))),Add($close,Mul(Mul(Constant(10.0),Mul(Mul($vwap,$volume),$open)),Constant(-2.0)))),Constant(-0.5))
+----------------------------------------
+| pool/                   |            |
+|    best_ic_ret          | 0.13       |
+|    eval_cnt             | 15708      |
+|    significant          | 5          |
+|    size                 | 5          |
+| rollout/                |            |
+|    ep_len_mean          | 5.91       |
+|    ep_rew_mean          | 0.109      |
+| test/                   |            |
+|    ic                   | 0.00995    |
+|    rank_ic              | 0.0164     |
+| time/                   |            |
+|    fps                  | 22         |
+|    iterations           | 52         |
+|    time_elapsed         | 4637       |
+|    total_timesteps      | 106496     |
+| train/                  |            |
+|    approx_kl            | 0.04126559 |
+|    clip_fraction        | 0.33       |
+|    clip_range           | 0.2        |
+|    entropy_loss         | -2.11      |
+|    explained_variance   | -0.0318    |
+|    learning_rate        | 0.0003     |
+|    loss                 | -0.0541    |
+|    n_updates            | 510        |
+|    policy_gradient_loss | -0.0308    |
+|    value_loss           | 0.00613    |
+----------------------------------------
