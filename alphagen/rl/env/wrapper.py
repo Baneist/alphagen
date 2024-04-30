@@ -24,7 +24,7 @@ OFFSET_CONSTANT = OFFSET_DELTA_TIME + SIZE_DELTA_TIME
 OFFSET_SEP = OFFSET_CONSTANT + SIZE_CONSTANT
 
 
-def action2token(action_raw: int) -> Token:
+def action2token(action_raw: int, constants: float) -> Token:
     action = action_raw + 1
     if action < OFFSET_OP:
         raise ValueError
@@ -35,7 +35,7 @@ def action2token(action_raw: int) -> Token:
     elif action < OFFSET_CONSTANT:
         return DeltaTimeToken(DELTA_TIMES[action - OFFSET_DELTA_TIME])
     elif action < OFFSET_SEP:
-        return ConstantToken(CONSTANTS[action - OFFSET_CONSTANT])
+        return ConstantToken(constants)
     elif action == OFFSET_SEP:
         return SequenceIndicatorToken(SequenceIndicatorType.SEP)
     else:
@@ -45,13 +45,18 @@ def action2token(action_raw: int) -> Token:
 class AlphaEnvWrapper(gym.Wrapper):
     state: np.ndarray
     env: AlphaEnvCore
-    action_space: gym.spaces.Discrete
+    #action_space: gym.spaces.Discrete
+    action_space = gym.spaces.Dict
     observation_space: gym.spaces.Box
     counter: int
 
     def __init__(self, env: AlphaEnvCore):
         super().__init__(env)
-        self.action_space = gym.spaces.Discrete(SIZE_ACTION)
+        #self.action_space = gym.spaces.Discrete(SIZE_ACTION)
+        gym.spaces.Tuple
+        self.action_space = gym.spaces.Tuple([
+            gym.spaces.Discrete(SIZE_ACTION),
+            gym.spaces.Box(low=-10., high=10., shape=(1, ), dtype=np.float32),])
         self.observation_space = gym.spaces.Box(low=0, high=SIZE_ALL - 1, shape=(MAX_EXPR_LENGTH, ), dtype=np.uint8)
 
     def reset(self, **kwargs) -> Tuple[np.ndarray, dict]:
@@ -60,15 +65,18 @@ class AlphaEnvWrapper(gym.Wrapper):
         self.env.reset()
         return self.state, {}
 
-    def step(self, action: int):
+    def step(self, action):
+        print(type(action))
+        assert type(action) is type(int)
         _, reward, done, truncated, info = self.env.step(self.action(action))
         if not done:
             self.state[self.counter] = action
             self.counter += 1
         return self.state, self.reward(reward), done, truncated, info
 
-    def action(self, action: int) -> Token:
-        return action2token(action)
+    def action(self, action) -> Token:
+        ob = gym.wrappers.FlattenObservation(action)
+        return action2token(ob[0], ob[1])
 
     def reward(self, reward: float) -> float:
         return reward + REWARD_PER_STEP
