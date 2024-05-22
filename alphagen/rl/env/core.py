@@ -1,4 +1,5 @@
-from typing import Tuple, Optional
+import typing
+from typing import Tuple, Optional, Any
 import gymnasium as gym
 import math
 
@@ -9,7 +10,7 @@ from alphagen.data.tree import ExpressionBuilder
 from alphagen.models.alpha_pool import AlphaPoolBase, AlphaPool
 from alphagen.utils import reseed_everything
 
-
+TaskType = Any
 class AlphaEnvCore(gym.Env):
     pool: AlphaPoolBase
     _tokens: List[Token]
@@ -26,7 +27,7 @@ class AlphaEnvCore(gym.Env):
         self.pool = pool
         self._print_expr = print_expr
         self._device = device
-
+        self.cur_task = 0
         self.eval_cnt = 0
 
         self.render_mode = None
@@ -101,3 +102,26 @@ class AlphaEnvCore(gym.Env):
 
     def render(self, mode='human'):
         pass
+
+    def sample_tasks(self, n_tasks: int) -> List[TaskType]:
+        """Samples task of the meta-environment
+        Args:
+            n_tasks (int) : number of different meta-tasks needed
+        Returns:
+            tasks (list) : an (n_tasks) length list of tasks
+        """
+        return [i for i in range(n_tasks)]
+
+    def set_task(self, task: TaskType) -> None:
+        """Sets the specified task to the current environment
+        Args:
+            task: task of the meta-learning environment
+        """
+        self.cur_task = task
+
+    def get_task(self) -> TaskType:
+        """Gets the task that the agent is performing in the current environment
+        Returns:
+            task: task of the meta-learning environment
+        """
+        return self.cur_task

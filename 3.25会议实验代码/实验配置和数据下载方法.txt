@@ -1,4 +1,0 @@
-配置：alphagen运行配置为--seed=19260817 --pool=4 --code=csi300 --step=200_000，其余按默认配置
-数据下载：首先安装pyqlib，安装好后用命令 python -m qlib.run.get_data qlib_data --target_dir ~/.qlib/qlib_data/cn_data --region cn 下载到2020年5月18日的日频基本数据
-其次在安装好baostock后运行命令python data_collection/fetch_baostock_data.py拉去到今日的最新数据，自动存放在~/.qlib/qlib_data/cn_data_rolling中（如果不是这个可以看alphagen_qlib/stock_data.py, function StockData._init_qlib中写的地址）
-默认的拉去数据的list文件只有all，没有csi300，需要从~/.qlib/qlib_data/cn_data中把csi300.txt复制过来
