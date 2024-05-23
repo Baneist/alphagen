@@ -22,6 +22,9 @@ from torch.nn.utils import parameters_to_vector, vector_to_parameters
 from torch.distributions import Normal, Categorical
 from torch.utils.tensorboard import SummaryWriter
 
+from stable_baselines3.ppo.policies import MlpPolicy
+from alphagen.rl.policy import LSTMSharedNet
+
 EPSILON = 1e-6
 
 def linear_init(module):
@@ -31,9 +34,10 @@ def linear_init(module):
     return module
 
 
-class DiagNormalPolicy(nn.Module):
-    def __init__(self, input_size, output_size, hiddens=None, activation='relu', device='cpu'):
-        super(DiagNormalPolicy, self).__init__()
+class MetaMlpPolicy(nn.Module):
+    def __init__(self, input_size, output_size, observation_space, ext_device, d_model,
+                 hiddens=None, activation='relu', device='cpu'):
+        super(MetaMlpPolicy, self).__init__()
         self.device = device
         if hiddens is None:
             hiddens = [100, 100]
@@ -41,27 +45,32 @@ class DiagNormalPolicy(nn.Module):
             activation = nn.ReLU
         elif activation == 'tanh':
             activation = nn.Tanh
-        layers = [linear_init(nn.Linear(input_size, hiddens[0])), activation()]
+        self.feature_extractor = LSTMSharedNet(observation_space, 1, d_model, .1, ext_device)
+        layers = [linear_init(nn.Linear(d_model, hiddens[0])), activation()]
         for i, o in zip(hiddens[:-1], hiddens[1:]):
             layers.append(linear_init(nn.Linear(i, o)))
             layers.append(activation())
         layers.append(linear_init(nn.Linear(hiddens[-1], output_size)))
-        self.mean = nn.Sequential(*layers)
+        self.mlp = nn.Sequential(*layers)
         self.sigma = nn.Parameter(torch.Tensor(output_size))
         self.sigma.data.fill_(math.log(1))
 
     def density(self, state):
         state = state.to(self.device, non_blocking=True)
-        loc = self.mean(state)
+        feature = self.feature_extractor(state)
+        feature = feature.reshape(feature.shape[0], -1)
+        loc = self.mlp(feature)
         scale = torch.exp(torch.clamp(self.sigma, min=math.log(EPSILON)))
         return Normal(loc=loc, scale=scale)
 
     def log_prob(self, state, action):
         density = self.density(state)
-        return density.log_prob(action).mean(dim=1, keepdim=True)
+        return density.log_prob(action).mlp(dim=1, keepdim=True)
     def forward(self, state):
-        density = self.density(state)
-        action = density.sample()
+        feature = self.feature_extractor(state)
+        assert feature.shape[0] == 2 and feature.shape[1] == 1
+        feature = feature.reshape(feature.shape[0], -1)
+        action = self.mlp(feature)
         return action
 
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
@@ -70,13 +79,13 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     return layer
 
 class MAMLPPO():
-    def __init__(self, env_pool, env_device, policy_kwargs,
+    def __init__(self, env_pool, env_device,
                  adapt_lr=1e-1, meta_lr=1e-2,
                  adapt_steps=3, ppo_steps=5,
-                 adapt_batch_size=20, meta_batch_size=20,
+                 adapt_batch_size=1024, meta_batch_size=1024,
                  gamma=0.99, tau=1.0,
                  policy_clip=0.2, value_clip=None,
-                 num_workers=10,
+                 num_workers=2,
                  seed=42,
                  device=None, name="MAMLPPO", tensorboard_log="./logs"):
 
@@ -85,7 +94,7 @@ class MAMLPPO():
         torch.manual_seed(seed)
 
         if torch.cuda.is_available():
-            self.device = torch.device("cuda")
+            self.device = torch.device("cpu")#cuda
             torch.cuda.manual_seed(seed)
         else:
             self.device = torch.device("cpu")
@@ -98,6 +107,7 @@ class MAMLPPO():
             #env = ch.envs.ActionSpaceScaler(env)
             return env
         env = l2l.gym.AsyncVectorEnv([make_env for _ in range(num_workers)])
+        #env = make_env()
         env.seed(seed)
         env.set_task(env.sample_tasks(1)[0])
         self.env = ch.envs.Torch(env)
@@ -113,19 +123,18 @@ class MAMLPPO():
         self.value_clip = value_clip
         self.ppo_steps = ppo_steps
         self.global_iteration = 0
-
-        from stable_baselines3.ppo.policies import MlpPolicy
-        from alphagen.rl.policy import LSTMSharedNet
+        '''
         self.policy = MlpPolicy(observation_space=env.observation_space, action_space=env.action_space,lr_schedule=lambda x:x, features_extractor_class=LSTMSharedNet,
                 features_extractor_kwargs=dict(
                     n_layers=2,
-                    d_model=128,
+                    d_model=64,#128
                     dropout=0.1,
                     device=device,
-                ),)
+                ),)'''
 
-        #self.policy = DiagNormalPolicy(1, 1, device='cuda:0')
-        self.baseline = LinearValue(1, 1)
+        self.policy = MetaMlpPolicy(20, 48, device='cpu', observation_space=self.env.observation_space,
+                                    ext_device=self.device, d_model=64)
+        self.baseline = LinearValue(20, 1)
         #self.policy = DiagNormalPolicy(self.env.state_size, self.env.action_size, device=self.device)
         #self.baseline = LinearValue(self.env.state_size, self.env.action_size)
 
@@ -151,8 +160,8 @@ class MAMLPPO():
     def collect_steps(self, policy, n_episodes):
         self.env.reset()
         task = ch.envs.Runner(self.env)
-        replay = task.run(policy, episodes=n_episodes).to(self.device)
-
+        replay = task.run(lambda x: np.argmax(policy(x).detach(), 1), episodes=n_episodes).to(self.device)
+        #lambda x: tuple(policy(x)[0])
         with torch.no_grad():
             next_state_value = self.baseline(replay[-1].next_state)
             mass = policy.density(replay.state())

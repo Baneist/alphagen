@@ -1,5 +1,5 @@
 from typing import Tuple
-import gymnasium as gym
+import gym
 import numpy as np
 
 from alphagen.config import *
@@ -54,18 +54,18 @@ class AlphaEnvWrapper(gym.Wrapper):
         self.action_space = gym.spaces.Discrete(SIZE_ACTION)
         self.observation_space = gym.spaces.Box(low=0, high=SIZE_ALL - 1, shape=(MAX_EXPR_LENGTH, ), dtype=np.uint8)
 
-    def reset(self, **kwargs) -> Tuple[np.ndarray, dict]:
+    def reset(self, **kwargs):# -> Tuple[np.ndarray, dict]:
         self.counter = 0
         self.state = np.zeros(MAX_EXPR_LENGTH, dtype=np.uint8)
         self.env.reset()
-        return self.state, {}
+        return self.state
 
     def step(self, action: int):
         _, reward, done, truncated, info = self.env.step(self.action(action))
         if not done:
             self.state[self.counter] = action
             self.counter += 1
-        return self.state, self.reward(reward), done, truncated, info
+        return self.state, self.reward(reward), done, info #truncated, info
 
     def action(self, action: int) -> Token:
         return action2token(action)

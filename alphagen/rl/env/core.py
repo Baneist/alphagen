@@ -1,6 +1,6 @@
 import typing
 from typing import Tuple, Optional, Any
-import gymnasium as gym
+import gym
 import math
 
 from alphagen.config import MAX_EXPR_LENGTH
@@ -19,7 +19,7 @@ class AlphaEnvCore(gym.Env):
 
     def __init__(self,
                  pool: AlphaPoolBase,
-                 device: torch.device = torch.device('cuda:0'),
+                 device: torch.device = torch.device('cpu'),#cuda:0
                  print_expr: bool = False
                  ):
         super().__init__()
@@ -46,9 +46,9 @@ class AlphaEnvCore(gym.Env):
     def step(self, action: Token) -> Tuple[List[Token], float, bool, bool, dict]:
         if (isinstance(action, SequenceIndicatorToken) and
                 action.indicator == SequenceIndicatorType.SEP):
-            reward = self._evaluate()
+            reward = self._evaluate() if self._builder.is_valid() else -1.
             done = True
-        elif len(self._tokens) < MAX_EXPR_LENGTH:
+        elif len(self._tokens) < MAX_EXPR_LENGTH and self._builder.validate(action):
             self._tokens.append(action)
             self._builder.add_token(action)
             done = False

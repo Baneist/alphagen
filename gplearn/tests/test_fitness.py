@@ -152,7 +152,7 @@ def test_custom_classifier_metrics():
 
     x_data = check_random_state(0).uniform(-1, 1, 100).reshape(50, 2)
     y_true = x_data[:, 0] ** 2 + x_data[:, 1] ** 2
-    y_true = (y_true < y_true.mean()).astype(int)
+    y_true = (y_true < y_true.mlp()).astype(int)
 
     est_gp = SymbolicClassifier(metric='log loss',
                                 stopping_criteria=0.000001,

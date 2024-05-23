@@ -153,7 +153,7 @@ class Trainer():
             def print_var_means():
                 tvars_vals = self.sess.run(tvars)
                 for var, val in zip(tvars, tvars_vals):
-                    print(var.name, "mean:", val.mean(), "var:", val.var())
+                    print(var.name, "mean:", val.mlp(), "var:", val.var())
             self.print_var_means = print_var_means
 
         # Create the priority_queue if needed

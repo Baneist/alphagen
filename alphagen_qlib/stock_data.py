@@ -24,7 +24,7 @@ class StockData:
                  max_backtrack_days: int = 100,
                  max_future_days: int = 30,
                  features: Optional[List[FeatureType]] = None,
-                 device: torch.device = torch.device('cuda:0')) -> None:
+                 device: torch.device = torch.device('cuda:0')) -> None: #
         self._init_qlib()
 
         self._instrument = instrument

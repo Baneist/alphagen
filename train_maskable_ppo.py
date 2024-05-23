@@ -5,7 +5,6 @@ from datetime import datetime
 import fire
 
 import numpy as np
-from sb3_contrib.ppo_mask import MaskablePPO
 from stable_baselines3.common.callbacks import BaseCallback
 from alphagen.data.calculator import AlphaCalculator
 
@@ -95,8 +94,7 @@ def main(
     steps: int = 200_000
 ):
     reseed_everything(seed)
-
-    device = torch.device('cuda:0')
+    device = torch.device('cpu')#cuda:0
     close = Feature(FeatureType.CLOSE)
     target = Ref(close, -20) / close - 1
 
@@ -135,7 +133,12 @@ def main(
         timestamp=timestamp,
         verbose=1,
     )
-
+    from MAML_PPO import MAMLPPO
+    model = MAMLPPO(env_pool=pool, env_device=device, device=device,
+                    gamma=1.,
+                    )
+    model.train(CustomCallback)
+    '''
     model = MaskablePPO(
         'MlpPolicy',
         env,
@@ -160,7 +163,7 @@ def main(
         callback=checkpoint_callback,
         tb_log_name=f'{name_prefix}_{timestamp}',
     )
-
+    '''
 
 def fire_helper(
     seed: Union[int, Tuple[int]],

@@ -1,4 +1,4 @@
-import gymnasium as gym
+import gym
 import math
 import torch.nn.functional as F
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
@@ -64,7 +64,7 @@ class TransformerSharedNet(BaseFeaturesExtractor):
         pad_mask = obs == 0
         src = self._pos_enc(self._token_emb(obs))
         res = self._transformer(src, src_key_padding_mask=pad_mask)
-        return res.mean(dim=1)
+        return res.mlp(dim=1)
 
 
 class LSTMSharedNet(BaseFeaturesExtractor):
@@ -103,7 +103,7 @@ class LSTMSharedNet(BaseFeaturesExtractor):
         real_len = (obs != 0).sum(1).max()
         src = self._pos_enc(self._token_emb(obs))
         res = self._lstm(src[:,:real_len])[0]
-        return res.mean(dim=1)
+        return res
 
 
 class Decoder(BaseFeaturesExtractor):
@@ -148,4 +148,4 @@ class Decoder(BaseFeaturesExtractor):
         res = self._token_emb(obs)                                  # (bs, len, d_model)
         res = self._pos_enc(res)                                    # (bs, len, d_model)
         res = self._decoder(res, src_key_padding_mask=pad_mask)     # (bs, len, d_model)
-        return res.mean(dim=1)                                      # (bs, d_model)
+        return res.mlp(dim=1)                                      # (bs, d_model)

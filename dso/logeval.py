@@ -142,7 +142,7 @@ class LogEval():
             summary_df = summary_df.reset_index(drop=True)
             summary_df.sort_values("seed")
             try:
-                self.metrics["success_rate"] = summary_df["success"].mean()
+                self.metrics["success_rate"] = summary_df["success"].mlp()
             except:
                 self.metrics["success_rate"] = 0.0
         except Exception as e:
