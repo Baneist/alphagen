@@ -18,11 +18,10 @@ from alphagen_qlib.calculator import QLibStockDataCalculator
 
 class CustomCallback(BaseCallback):
     def __init__(self,
+                 env_pool,
                  save_freq: int,
                  show_freq: int,
                  save_path: str,
-                 valid_calculator: AlphaCalculator,
-                 test_calculator: AlphaCalculator,
                  name_prefix: str = 'rl_model',
                  timestamp: Optional[str] = None,
                  verbose: int = 0):
@@ -31,9 +30,7 @@ class CustomCallback(BaseCallback):
         self.show_freq = show_freq
         self.save_path = save_path
         self.name_prefix = name_prefix
-
-        self.valid_calculator = valid_calculator
-        self.test_calculator = test_calculator
+        self.pool = env_pool
 
         if timestamp is None:
             self.timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
@@ -78,14 +75,6 @@ class CustomCallback(BaseCallback):
         print(f'>> Ensemble ic_ret: {state["best_ic_ret"]}')
         print('---------------------------------------------')
 
-    @property
-    def pool(self) -> AlphaPoolBase:
-        return self.env_core.pool
-
-    @property
-    def env_core(self) -> AlphaEnvCore:
-        return self.training_env.envs[0].unwrapped  # type: ignore
-
 
 def main(
     seed: int = 0,
@@ -94,7 +83,6 @@ def main(
     steps: int = 200_000
 ):
     reseed_everything(seed)
-    device = torch.device('cpu')#cuda:0
     close = Feature(FeatureType.CLOSE)
     target = Ref(close, -20) / close - 1
 
@@ -102,21 +90,25 @@ def main(
     data_train = StockData(instrument=instruments,
                            start_time='2010-01-01',
                            end_time='2017-12-31') #2019-12-31')
-    data_valid = StockData(instrument=instruments,
+    calculator_train = QLibStockDataCalculator(data_train, target)
+    device = torch.device('cuda:0')
+    '''
+    #=data_valid = StockData(instrument=instruments,
                            start_time='2018-01-01', #2020-01-01',
-                           end_time='2018-12-31') #2020-12-31')
+                           end_time='2018-12-31', device=device) #2020-12-31')
     data_test = StockData(instrument=instruments,
                           start_time='2019-01-01', #2021-01-01',
-                          end_time='2020-01-01') #2022-12-31')
-    calculator_train = QLibStockDataCalculator(data_train, target)
+                          end_time='2020-01-01', device=device) #2022-12-31')
     calculator_valid = QLibStockDataCalculator(data_valid, target)
     calculator_test = QLibStockDataCalculator(data_test, target)
+    '''
 
     pool = AlphaPool(
         capacity=pool_capacity,
         calculator=calculator_train,
         ic_lower_bound=None,
-        l1_alpha=5e-3
+        l1_alpha=5e-3,
+        device=device,
     )
     env = AlphaEnv(pool=pool, device=device, print_expr=True)
 
@@ -127,17 +119,16 @@ def main(
         save_freq=10000,
         show_freq=10000,
         save_path='./path/for/checkpoints',
-        valid_calculator=calculator_valid,
-        test_calculator=calculator_test,
         name_prefix=name_prefix,
         timestamp=timestamp,
         verbose=1,
+        env_pool = pool,
     )
     from MAML_PPO import MAMLPPO
     model = MAMLPPO(env_pool=pool, env_device=device, device=device,
-                    gamma=1.,
+                    gamma=1., adapt_batch_size=8, meta_batch_size=64, num_workers=8, adapt_steps=2,
                     )
-    model.train(CustomCallback)
+    model.train(checkpoint_callback)
     '''
     model = MaskablePPO(
         'MlpPolicy',

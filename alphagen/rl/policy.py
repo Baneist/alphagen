@@ -66,6 +66,48 @@ class TransformerSharedNet(BaseFeaturesExtractor):
         res = self._transformer(src, src_key_padding_mask=pad_mask)
         return res.mlp(dim=1)
 
+class TransformerFeaturesExtractor(nn.Module):
+    def __init__(
+        self,
+        observation_space: gym.Space,
+        n_encoder_layers: int,
+        d_model: int,
+        n_head: int,
+        d_ffn: int,
+        dropout: float,
+        device: torch.device
+    ):
+        super().__init__()
+
+        assert isinstance(observation_space, gym.spaces.Box)
+        n_actions = observation_space.high[0] + 1                   # type: ignore
+
+        self._device = device
+        self._d_model = d_model
+        self._n_actions: float = n_actions
+
+        self._token_emb = nn.Embedding(n_actions + 1, d_model, 0)   # Last one is [BEG]
+        self._pos_enc = PositionalEncoding(d_model).to(device)
+
+        self._transformer = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(
+                d_model=d_model, nhead=n_head,
+                dim_feedforward=d_ffn, dropout=dropout,
+                activation=lambda x: F.leaky_relu(x),               # type: ignore
+                batch_first=True, device=device
+            ),
+            num_layers=n_encoder_layers,
+            norm=nn.LayerNorm(d_model, eps=1e-5, device=device)
+        )
+
+    def forward(self, obs: Tensor) -> Tensor:
+        bs, seqlen = obs.shape
+        beg = torch.full((bs, 1), fill_value=self._n_actions, dtype=torch.long, device=obs.device)
+        obs = torch.cat((beg, obs.long()), dim=1)
+        pad_mask = obs == 0
+        src = self._pos_enc(self._token_emb(obs))
+        res = self._transformer(src)#, src_key_padding_mask=pad_mask
+        return res
 
 class LSTMSharedNet(BaseFeaturesExtractor):
     def __init__(
@@ -105,6 +147,47 @@ class LSTMSharedNet(BaseFeaturesExtractor):
         res = self._lstm(src[:,:real_len])[0]
         return res
 
+class LSTMFeaturesExtractor(nn.Module):
+    def __init__(
+        self,
+        observation_space: gym.Space,
+        n_layers: int,
+        d_model: int,
+        dropout: float,
+        batch_size: int,
+        device: torch.device
+    ):
+        super().__init__()
+
+        assert isinstance(observation_space, gym.spaces.Box)
+        n_actions = observation_space.high[0] + 1                   # type: ignore
+
+        self._device = device
+        self._d_model = d_model
+        self._n_actions: float = n_actions
+        self.batch_size = batch_size
+        self._token_emb = nn.Embedding(n_actions + 1, d_model, 0)   # Last one is [BEG]
+        self._pos_enc = PositionalEncoding(d_model).to(device)
+
+        self._lstm = nn.LSTM(
+            input_size=d_model,
+            hidden_size=d_model,
+            num_layers=n_layers,
+            batch_first=True,
+            dropout=dropout
+        )
+        self.n_layers = n_layers
+        self.d_model = d_model
+    def forward(self, obs: Tensor) -> Tensor:
+        bs, seqlen = obs.shape
+        beg = torch.full((bs, 1), fill_value=self._n_actions, dtype=torch.long, device=obs.device)
+        obs = torch.cat((beg, obs.long()), dim=1)
+        real_len = (obs != 0).sum(1).max()
+        src = self._pos_enc(self._token_emb(obs))
+        res = self._lstm(src[:,:real_len])[0]
+
+        res = torch.cat((res, torch.full((bs, seqlen - res.shape[1], self._d_model), fill_value=1e-8, dtype=torch.float, device=obs.device)), dim=1) if res.shape[1] < seqlen else res
+        return res
 
 class Decoder(BaseFeaturesExtractor):
     def __init__(

@@ -147,7 +147,7 @@ if __name__ == "__main__":
 
     data = StockData(instrument='csi300',
                      start_time='2015-01-01',
-                     end_time='2021-12-31')
+                     end_time='2023-12-31')
     # expr = Mul(EMA(Sub(Delta(Mul(Log(open_),Constant(-30.0)),50),Constant(-0.01)),40),Mul(Div(Abs(EMA(low,50)),close),Constant(0.01)))
     # expr = Abs(Abs(Log(Sum(Mul(Mul(Constant(-5.0),Log(Div(Greater(Sub(Sub(vwap,Constant(-0.01)),Constant(1.0)),vwap),Constant(30.0)))),Constant(-0.5)),30))))
     # expr = Greater(Mul(Constant(-0.5),vwap),Mul(Sub(vwap,low),Constant(30.0)))

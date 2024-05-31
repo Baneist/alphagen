@@ -19,7 +19,7 @@ class AlphaEnvCore(gym.Env):
 
     def __init__(self,
                  pool: AlphaPoolBase,
-                 device: torch.device = torch.device('cpu'),#cuda:0
+                 device: torch.device = torch.device('cuda:0'),
                  print_expr: bool = False
                  ):
         super().__init__()

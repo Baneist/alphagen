@@ -348,8 +348,8 @@ class Skew(RollingOperator):
     def _apply(self, operand: Tensor) -> Tensor:
         # skew = m3 / m2^(3/2)
         central = operand - operand.mean(dim=-1, keepdim=True)
-        m3 = (central ** 3).mlp(dim=-1)
-        m2 = (central ** 2).mlp(dim=-1)
+        m3 = (central ** 3).mean(dim=-1)
+        m2 = (central ** 2).mean(dim=-1)
         return m3 / m2 ** 1.5
 
 
@@ -357,7 +357,7 @@ class Kurt(RollingOperator):
     def _apply(self, operand: Tensor) -> Tensor:
         # kurt = m4 / var^2 - 3
         central = operand - operand.mean(dim=-1, keepdim=True)
-        m4 = (central ** 4).mlp(dim=-1)
+        m4 = (central ** 4).mean(dim=-1)
         var = operand.var(dim=-1)
         return m4 / var ** 2 - 3
 
@@ -377,7 +377,7 @@ class Med(RollingOperator):
 class Mad(RollingOperator):
     def _apply(self, operand: Tensor) -> Tensor:
         central = operand - operand.mean(dim=-1, keepdim=True)
-        return central.abs().mlp(dim=-1)
+        return central.abs().mean(dim=-1)
 
 
 class Rank(RollingOperator):

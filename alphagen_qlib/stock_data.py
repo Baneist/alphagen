@@ -24,7 +24,7 @@ class StockData:
                  max_backtrack_days: int = 100,
                  max_future_days: int = 30,
                  features: Optional[List[FeatureType]] = None,
-                 device: torch.device = torch.device('cuda:0')) -> None: #
+                 device: str = 'cuda:0') -> None: #
         self._init_qlib()
 
         self._instrument = instrument
@@ -70,7 +70,7 @@ class StockData:
         stock_ids = df.columns
         values = df.values
         values = values.reshape((-1, len(features), values.shape[-1]))  # type: ignore
-        return torch.tensor(values, dtype=torch.float, device=self.device), dates, stock_ids
+        return torch.tensor(values, dtype=torch.float, device=torch.device(self.device)), dates, stock_ids
 
     @property
     def n_features(self) -> int:

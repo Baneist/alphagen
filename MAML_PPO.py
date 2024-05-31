@@ -23,7 +23,7 @@ from torch.distributions import Normal, Categorical
 from torch.utils.tensorboard import SummaryWriter
 
 from stable_baselines3.ppo.policies import MlpPolicy
-from alphagen.rl.policy import LSTMSharedNet
+from alphagen.rl.policy import LSTMFeaturesExtractor, TransformerFeaturesExtractor
 
 EPSILON = 1e-6
 
@@ -35,8 +35,8 @@ def linear_init(module):
 
 
 class MetaMlpPolicy(nn.Module):
-    def __init__(self, input_size, output_size, observation_space, ext_device, d_model,
-                 hiddens=None, activation='relu', device='cpu'):
+    def __init__(self, input_size, output_size, observation_space, ext_device, d_model, device,batch_size,
+                 n_layers=4, hiddens=None, activation='relu'):
         super(MetaMlpPolicy, self).__init__()
         self.device = device
         if hiddens is None:
@@ -45,8 +45,11 @@ class MetaMlpPolicy(nn.Module):
             activation = nn.ReLU
         elif activation == 'tanh':
             activation = nn.Tanh
-        self.feature_extractor = LSTMSharedNet(observation_space, 1, d_model, .1, ext_device)
-        layers = [linear_init(nn.Linear(d_model, hiddens[0])), activation()]
+
+        self.feature_extractor = TransformerFeaturesExtractor(observation_space=observation_space, n_encoder_layers=n_layers, d_model=d_model,d_ffn=d_model,n_head=5, dropout=.1, device=ext_device)
+        layers = [linear_init(nn.Linear(d_model * (input_size+1), hiddens[0])), activation()]
+        #self.feature_extractor = LSTMFeaturesExtractor(observation_space, n_layers, d_model, .1,batch_size=batch_size, device=ext_device)
+        #layers = [linear_init(nn.Linear(d_model * input_size, hiddens[0])), activation()]
         for i, o in zip(hiddens[:-1], hiddens[1:]):
             layers.append(linear_init(nn.Linear(i, o)))
             layers.append(activation())
@@ -60,17 +63,22 @@ class MetaMlpPolicy(nn.Module):
         feature = self.feature_extractor(state)
         feature = feature.reshape(feature.shape[0], -1)
         loc = self.mlp(feature)
+        #loc = self.mlp(state)
         scale = torch.exp(torch.clamp(self.sigma, min=math.log(EPSILON)))
         return Normal(loc=loc, scale=scale)
 
     def log_prob(self, state, action):
         density = self.density(state)
-        return density.log_prob(action).mlp(dim=1, keepdim=True)
+        return density.log_prob(action).mean(dim=1, keepdim=True)
     def forward(self, state):
+        '''
+        state = state.to(self.device, non_blocking=True)
         feature = self.feature_extractor(state)
-        assert feature.shape[0] == 2 and feature.shape[1] == 1
         feature = feature.reshape(feature.shape[0], -1)
-        action = self.mlp(feature)
+        action = self.mlp(feature)'''
+        #action = self.mlp(state)
+        density = self.density(state)
+        action = density.sample()
         return action
 
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
@@ -80,9 +88,9 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 class MAMLPPO():
     def __init__(self, env_pool, env_device,
-                 adapt_lr=1e-1, meta_lr=1e-2,
-                 adapt_steps=3, ppo_steps=5,
-                 adapt_batch_size=1024, meta_batch_size=1024,
+                 adapt_lr=2e-2, meta_lr=2e-3,
+                 adapt_steps=3, ppo_steps=2,
+                 adapt_batch_size=20, meta_batch_size=20,
                  gamma=0.99, tau=1.0,
                  policy_clip=0.2, value_clip=None,
                  num_workers=2,
@@ -92,22 +100,15 @@ class MAMLPPO():
         random.seed(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)
-
-        if torch.cuda.is_available():
-            self.device = torch.device("cpu")#cuda
-            torch.cuda.manual_seed(seed)
-        else:
-            self.device = torch.device("cpu")
-        if device:
-            self.device = torch.device(device)
+        self.device = torch.device(device)
         print("Running on: " + str(self.device))
-
+        torch.autograd.set_detect_anomaly(True)
         def make_env():
             env = AlphaEnv(pool=env_pool, device=env_device, print_expr=True)
             #env = ch.envs.ActionSpaceScaler(env)
             return env
-        env = l2l.gym.AsyncVectorEnv([make_env for _ in range(num_workers)])
-        #env = make_env()
+        #env = l2l.gym.AsyncVectorEnv([make_env for _ in range(num_workers)])
+        env = make_env()
         env.seed(seed)
         env.set_task(env.sample_tasks(1)[0])
         self.env = ch.envs.Torch(env)
@@ -132,8 +133,8 @@ class MAMLPPO():
                     device=device,
                 ),)'''
 
-        self.policy = MetaMlpPolicy(20, 48, device='cpu', observation_space=self.env.observation_space,
-                                    ext_device=self.device, d_model=64)
+        self.policy = MetaMlpPolicy(20, 48, device=self.device, observation_space=self.env.observation_space,batch_size=adapt_batch_size,
+                                    ext_device=self.device, d_model=30)
         self.baseline = LinearValue(20, 1)
         #self.policy = DiagNormalPolicy(self.env.state_size, self.env.action_size, device=self.device)
         #self.baseline = LinearValue(self.env.state_size, self.env.action_size)
@@ -160,7 +161,7 @@ class MAMLPPO():
     def collect_steps(self, policy, n_episodes):
         self.env.reset()
         task = ch.envs.Runner(self.env)
-        replay = task.run(lambda x: np.argmax(policy(x).detach(), 1), episodes=n_episodes).to(self.device)
+        replay = task.run(lambda x: np.argmax(policy(x).cpu().detach(), 1), episodes=n_episodes).to(self.device)
         #lambda x: tuple(policy(x)[0])
         with torch.no_grad():
             next_state_value = self.baseline(replay[-1].next_state)
@@ -284,3 +285,4 @@ class MAMLPPO():
                 self.writer.add_scalar("adaptation_reward", adaptation_reward, self.global_iteration)
 
             self.meta_optimize(iteration_replays, iteration_policies)
+            callback.show_pool_state()

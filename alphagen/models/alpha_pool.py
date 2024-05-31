@@ -19,7 +19,7 @@ class AlphaPoolBase(metaclass=ABCMeta):
         self,
         capacity: int,
         calculator: AlphaCalculator,
-        device: torch.device = torch.device('cpu')
+        device: torch.device = torch.device('cuda:0')
     ):
         self.capacity = capacity
         self.calculator = calculator
@@ -42,7 +42,7 @@ class AlphaPool(AlphaPoolBase):
         calculator: AlphaCalculator,
         ic_lower_bound: Optional[float] = None,
         l1_alpha: float = 5e-3,
-        device: torch.device = torch.device('cpu')
+        device: torch.device = torch.device('cuda:0')
     ):
         super().__init__(capacity, calculator, device)
 
